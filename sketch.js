@@ -1,6 +1,6 @@
 // ======================================
 // NEON HIGHWAY
-// TOP 10 RANKING EDITION
+// TOP 10 RANKING + NAME ENTRY EDITION
 // ======================================
 
 let gameState = "title";
@@ -21,6 +21,11 @@ let previousLane = -1;
 
 let ranking = [];
 let gameOverSaved = false;
+let lastRank = 0;
+
+let nameEntryContainer = null;
+let nameInputElement = null;
+let gameCanvas = null;
 
 const LANES = [-0.65, 0, 0.65];
 
@@ -92,7 +97,7 @@ const BACKGROUNDS = [
 // ======================================
 
 function setup() {
-  createCanvas(1000, 650);
+  gameCanvas = createCanvas(1000, 650);
   textFont("Arial");
 
   loadRanking();
@@ -124,6 +129,10 @@ function loadRanking() {
             typeof item.score === "number" &&
             Number.isFinite(item.score)
           )
+          .map(item => ({
+            name: String(item.name || "PLAYER").trim().slice(0, 14) || "PLAYER",
+            score: item.score
+          }))
           .sort((a, b) => b.score - a.score)
           .slice(0, 10);
       }
@@ -145,19 +154,30 @@ function saveRanking() {
   }
 }
 
-function recordScore() {
+function recordScore(playerName) {
   if (gameOverSaved) return;
 
   gameOverSaved = true;
 
+  let cleanName = String(playerName || "PLAYER").trim().slice(0, 14);
+
+  if (cleanName.length === 0) {
+    cleanName = "PLAYER";
+  }
+
   let newRecord = {
-    name: "PLAYER",
+    name: cleanName,
     score: score
   };
 
   ranking.push(newRecord);
-
   ranking.sort((a, b) => b.score - a.score);
+
+  let rankIndex = ranking.indexOf(newRecord);
+
+  lastRank = rankIndex >= 0 && rankIndex < 10
+    ? rankIndex + 1
+    : 0;
 
   ranking = ranking.slice(0, 10);
 
@@ -165,16 +185,140 @@ function recordScore() {
 }
 
 function getPlayerRank() {
-  for (let i = 0; i < ranking.length; i++) {
-    if (
-      ranking[i].name === "PLAYER" &&
-      ranking[i].score === score
-    ) {
-      return i + 1;
+  return lastRank;
+}
+
+// ======================================
+// 名前入力画面
+// ======================================
+
+function createNameEntryUI() {
+  removeNameEntryUI();
+
+  let bounds = gameCanvas.elt.getBoundingClientRect();
+
+  nameEntryContainer = document.createElement("div");
+
+  nameEntryContainer.style.position = "fixed";
+  nameEntryContainer.style.left =
+    (bounds.left + bounds.width / 2) + "px";
+
+  nameEntryContainer.style.top =
+    (bounds.top + bounds.height * 0.62) + "px";
+
+  nameEntryContainer.style.transform = "translate(-50%, -50%)";
+  nameEntryContainer.style.zIndex = "9999";
+  nameEntryContainer.style.width = "300px";
+  nameEntryContainer.style.boxSizing = "border-box";
+  nameEntryContainer.style.padding = "22px";
+  nameEntryContainer.style.textAlign = "center";
+  nameEntryContainer.style.background = "rgba(3, 10, 28, 0.97)";
+  nameEntryContainer.style.border = "2px solid #00dcff";
+  nameEntryContainer.style.borderRadius = "12px";
+  nameEntryContainer.style.boxShadow =
+    "0 0 25px rgba(0, 220, 255, 0.45)";
+  nameEntryContainer.style.fontFamily = "Arial, sans-serif";
+
+  let heading = document.createElement("div");
+
+  heading.textContent = "ENTER YOUR NAME";
+  heading.style.color = "#00dcff";
+  heading.style.fontSize = "22px";
+  heading.style.fontWeight = "bold";
+  heading.style.marginBottom = "12px";
+
+  nameEntryContainer.appendChild(heading);
+
+  let description = document.createElement("div");
+
+  description.textContent = "ランキングに表示する名前を入力";
+  description.style.color = "white";
+  description.style.fontSize = "13px";
+  description.style.marginBottom = "12px";
+
+  nameEntryContainer.appendChild(description);
+
+  nameInputElement = document.createElement("input");
+
+  nameInputElement.type = "text";
+  nameInputElement.maxLength = 14;
+  nameInputElement.placeholder = "YOUR NAME";
+  nameInputElement.autocomplete = "off";
+
+  nameInputElement.style.width = "100%";
+  nameInputElement.style.boxSizing = "border-box";
+  nameInputElement.style.padding = "11px";
+  nameInputElement.style.border = "1px solid #00dcff";
+  nameInputElement.style.borderRadius = "6px";
+  nameInputElement.style.outline = "none";
+  nameInputElement.style.background = "#101b32";
+  nameInputElement.style.color = "white";
+  nameInputElement.style.fontSize = "18px";
+  nameInputElement.style.textAlign = "center";
+  nameInputElement.style.marginBottom = "12px";
+
+  nameEntryContainer.appendChild(nameInputElement);
+
+  let submitButton = document.createElement("button");
+
+  submitButton.type = "button";
+  submitButton.textContent = "SAVE SCORE";
+  submitButton.style.width = "100%";
+  submitButton.style.padding = "11px";
+  submitButton.style.border = "0";
+  submitButton.style.borderRadius = "6px";
+  submitButton.style.background = "#00cfee";
+  submitButton.style.color = "#03101c";
+  submitButton.style.fontWeight = "bold";
+  submitButton.style.fontSize = "15px";
+  submitButton.style.cursor = "pointer";
+
+  nameEntryContainer.appendChild(submitButton);
+
+  let hint = document.createElement("div");
+
+  hint.textContent = "最大14文字 · Enterで登録";
+  hint.style.color = "#9bb8c8";
+  hint.style.fontSize = "11px";
+  hint.style.marginTop = "10px";
+
+  nameEntryContainer.appendChild(hint);
+
+  document.body.appendChild(nameEntryContainer);
+
+  submitButton.addEventListener("click", submitNameAndSaveScore);
+
+  nameInputElement.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitNameAndSaveScore();
     }
+  });
+
+  nameInputElement.focus();
+}
+
+function removeNameEntryUI() {
+  if (nameEntryContainer && nameEntryContainer.parentNode) {
+    nameEntryContainer.parentNode.removeChild(nameEntryContainer);
   }
 
-  return 0;
+  nameEntryContainer = null;
+  nameInputElement = null;
+}
+
+function submitNameAndSaveScore() {
+  if (gameState !== "nameEntry") return;
+
+  let playerName = nameInputElement
+    ? nameInputElement.value
+    : "";
+
+  recordScore(playerName);
+
+  removeNameEntryUI();
+
+  gameState = "gameover";
 }
 
 // ======================================
@@ -230,9 +374,13 @@ function draw() {
     drawRanking(500, 250);
   }
 
+  if (gameState === "nameEntry") {
+    drawNameEntry();
+  }
+
   if (gameState === "gameover") {
     drawGameOver();
-    drawRanking(500, 440);
+    drawRanking(500, 250);
   }
 }
 
@@ -635,8 +783,8 @@ function updateGame() {
     );
 
     if (checkCollision(playerHitbox, enemyHitbox)) {
-      gameState = "gameover";
-      recordScore();
+      gameState = "nameEntry";
+      createNameEntryUI();
       break;
     }
 
@@ -674,25 +822,41 @@ function checkCollision(a, b) {
 // ======================================
 
 function spawnTraffic() {
-  let laneIndex;
 
-  do {
-    laneIndex = floor(random(3));
-  } while (laneIndex === previousLane);
+  // 75%の確率で1台、25%の確率で2台
+  let carCount = random() < 0.25 ? 2 : 1;
 
-  previousLane = laneIndex;
+  // 前回最後に出たレーンを避ける
+  let laneIndices = [0, 1, 2].filter(
+    index => index !== previousLane
+  );
 
-  let carColor = random(CAR_COLORS);
+  // レーンの順番をランダムにする
+  for (let i = laneIndices.length - 1; i > 0; i--) {
+    let j = floor(random(i + 1));
 
-  enemies.push({
-    lane: LANES[laneIndex],
-    z: 0,
-    color: color(
-      carColor[0],
-      carColor[1],
-      carColor[2]
-    )
-  });
+    [laneIndices[i], laneIndices[j]] =
+      [laneIndices[j], laneIndices[i]];
+  }
+
+  // 車を出現させる
+  for (let i = 0; i < carCount; i++) {
+
+    let laneIndex = laneIndices[i];
+    let carColor = random(CAR_COLORS);
+
+    enemies.push({
+      lane: LANES[laneIndex],
+      z: 0,
+      color: color(
+        carColor[0],
+        carColor[1],
+        carColor[2]
+      )
+    });
+
+    previousLane = laneIndex;
+  }
 }
 
 function drawEnemies() {
@@ -1013,6 +1177,7 @@ function drawRanking(x, y) {
       );
     } else {
       fill(120);
+
       text(
         (i + 1) + "   ---",
         x,
@@ -1057,6 +1222,32 @@ function drawTitle() {
 }
 
 // ======================================
+// 名前入力中の画面
+// ======================================
+
+function drawNameEntry() {
+  rectMode(CORNER);
+
+  noStroke();
+  fill(0, 0, 0, 190);
+  rect(0, 0, width, height);
+
+  textAlign(CENTER, CENTER);
+
+  fill(0, 220, 255);
+  textStyle(BOLD);
+  textSize(38);
+
+  text("NEW RECORD?", width / 2, 210);
+
+  fill(255);
+  textStyle(NORMAL);
+  textSize(22);
+
+  text("SCORE : " + score, width / 2, 260);
+}
+
+// ======================================
 // ゲームオーバー
 // ======================================
 
@@ -1084,6 +1275,7 @@ function drawGameOver() {
 
   if (rank > 0) {
     fill(255, 215, 0);
+
     text(
       "YOUR RANK : " + rank,
       width / 2,
@@ -1093,6 +1285,7 @@ function drawGameOver() {
 
   fill(255);
   textSize(17);
+
   text("PRESS ENTER TO RETRY", width / 2, 625);
 }
 
@@ -1117,6 +1310,9 @@ function startGame() {
   previousLane = -1;
 
   gameOverSaved = false;
+  lastRank = 0;
+
+  removeNameEntryUI();
 }
 
 // ======================================
